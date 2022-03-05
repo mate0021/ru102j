@@ -5,9 +5,7 @@ import com.redislabs.university.RU102J.TestKeyManager;
 import com.redislabs.university.RU102J.api.MeterReading;
 import com.redislabs.university.RU102J.api.SiteStats;
 import org.junit.*;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.*;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -49,6 +47,24 @@ public class SiteStatsDaoRedisImplTest {
         keyManager.deleteKeys(jedis);
     }
 
+    @Test
+    public void homework23() {
+        jedis.set("a", "foo");
+        jedis.set("b", "bar");
+        jedis.set("c", "baz");
+
+        Transaction t = jedis.multi();
+
+        Response<String> r1 = t.set("b", "1");
+        Response<Long> r2 = t.incr("a"); // <- increment a String? JedisDataException...
+        Response<String> r3 = t.set("c", "100");
+
+        t.exec(); // <- ... but it's thrown just here
+
+        r1.get();
+        r2.get();
+        r3.get();
+    }
     @Test
     public void findById() {
         MeterReading r1 = generateMeterReading(1);
