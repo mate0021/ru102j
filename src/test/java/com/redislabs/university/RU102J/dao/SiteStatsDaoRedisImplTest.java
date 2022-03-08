@@ -65,6 +65,20 @@ public class SiteStatsDaoRedisImplTest {
         r2.get();
         r3.get();
     }
+
+    @Test
+    @Ignore
+    public void homework24() {
+        Pipeline pipeline = jedis.pipelined();
+
+        Response<Long> length = pipeline.zcard("set");
+        if (length.get() < 1000) { // <- this fails, because result is not yet available. Call sync() first.
+
+        }
+
+        pipeline.sync();
+    }
+
     @Test
     public void findById() {
         MeterReading r1 = generateMeterReading(1);
