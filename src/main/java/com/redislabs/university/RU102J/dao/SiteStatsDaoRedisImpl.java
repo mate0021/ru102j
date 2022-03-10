@@ -5,11 +5,14 @@ import com.redislabs.university.RU102J.api.SiteStats;
 import com.redislabs.university.RU102J.script.CompareAndUpdateScript;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Transaction;
 
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Map;
+
+import static com.redislabs.university.RU102J.api.SiteStats.*;
 
 public class SiteStatsDaoRedisImpl implements SiteStatsDao {
 
@@ -47,7 +50,7 @@ public class SiteStatsDaoRedisImpl implements SiteStatsDao {
             ZonedDateTime day = reading.getDateTime();
             String key = RedisSchema.getSiteStatsKey(siteId, day);
 
-            updateBasic(jedis, key, reading);
+            updateOptimized(jedis, key, reading);
         }
     }
 
@@ -55,8 +58,8 @@ public class SiteStatsDaoRedisImpl implements SiteStatsDao {
     // potential race conditions and makes several round trips to Redis.
     private void updateBasic(Jedis jedis, String key, MeterReading reading) {
         String reportingTime = ZonedDateTime.now(ZoneOffset.UTC).toString();
-        jedis.hset(key, SiteStats.reportingTimeField, reportingTime);
-        jedis.hincrBy(key, SiteStats.countField, 1);
+        jedis.hset(key, reportingTimeField, reportingTime);
+        jedis.hincrBy(key, countField, 1);
         jedis.expire(key, weekSeconds);
 
         String maxWh = jedis.hget(key, SiteStats.maxWhField);
@@ -81,6 +84,18 @@ public class SiteStatsDaoRedisImpl implements SiteStatsDao {
     // Challenge #3
     private void updateOptimized(Jedis jedis, String key, MeterReading reading) {
         // START Challenge #3
+        String reportingTime = ZonedDateTime.now(ZoneOffset.UTC).toString();
+        try (Transaction transaction = jedis.multi()) {
+            transaction.hset(key, reportingTimeField, reportingTime);
+            transaction.hincrBy(key, countField, 1);
+            transaction.expire(key, weekSeconds);
+
+            compareAndUpdateScript.updateIfGreater(transaction, key, maxWhField, reading.getWhGenerated());
+            compareAndUpdateScript.updateIfLess(transaction, key, minWhField, reading.getWhGenerated());
+            compareAndUpdateScript.updateIfGreater(transaction, key, maxCapacityField, getCurrentCapacity(reading));
+
+            transaction.exec();
+        }
         // END Challenge #3
     }
 

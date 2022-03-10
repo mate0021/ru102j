@@ -48,6 +48,7 @@ public class SiteStatsDaoRedisImplTest {
     }
 
     @Test
+    @Ignore
     public void homework23() {
         jedis.set("a", "foo");
         jedis.set("b", "bar");
